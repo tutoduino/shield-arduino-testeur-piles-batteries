@@ -1,4 +1,4 @@
-// Mesure de la tension et/ou de la capacité d'un accumulteur
+// Mesure de la tension et/ou de la capacité d'un accumulateur
 // https://tutoduino.fr/
 // Copyleft 2020
 
@@ -392,6 +392,7 @@ void setup() {
   digitalWrite(7, LOW);  
 
 }
+
 void loop() {
 
   // Affiche le menu de configuration lors de la première 
