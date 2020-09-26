@@ -1,4 +1,4 @@
-// Mesure de la tension et/ou de la capacité d'un accumulateur
+// Mesure de la tension et/ou de la capacité d'un accumulteur
 // https://tutoduino.fr/
 // Copyleft 2020
 
@@ -17,7 +17,11 @@ bool configOk = false;
 
 const uint8_t brocheBouton = 2;
 
-bool etatBouton = false;
+// Si le bouton est en mode pull-up sa valeur est 0
+// lorsqu'il est appuye. En mode pull-down sa valeur est
+// 0 lorsqu'il est appuye
+// Ici le montage est en pull-up
+#define BOUTON_APPUYE 0
 
 #define MESURE_TENSION 0
 #define MESURE_CAPACITE 1
@@ -30,8 +34,16 @@ bool etatBouton = false;
 uint8_t mesure;
 uint8_t accu;
 
+// Constantes de calibration 
+// -------------------------
 // Valeur de la resistance de decharge
-#define R 26.3
+#define R 26.7
+// Valeur de la tension de reference
+#define VREF 2.48
+// Rapport pont diviseur utilise sur A0
+#define PDIV0 2
+// Rapport pont diviseur utilise sur A1
+#define PDIV1 2
 
 // Seuil bas de la tension des accumulateurs
 // (piles et batteries)
@@ -67,13 +79,13 @@ bool appuiBouton() {
     // verifie si le bouton est appuyé pendant 
     // au moins 50 millisecondes afin d'éviter
     // un etat instable
-    if (digitalRead(brocheBouton) == 1) {
+    if (digitalRead(brocheBouton) == BOUTON_APPUYE) {
       delay(50);
-      if (digitalRead(brocheBouton) == 1) {
+      if (digitalRead(brocheBouton) == BOUTON_APPUYE) {
         // le bouton a bien ete appuye pendant 
         // le temps d'attente
         // on attend que le bouton soit relache
-        while (digitalRead(brocheBouton) == 1) {
+        while (digitalRead(brocheBouton) == BOUTON_APPUYE) {
           delay(100);
         }
         return true;
@@ -252,8 +264,8 @@ void mesureQuantiteElectricite() {
   
   // Lit la tension aux bornes de la pile et aux bornes 
   // de la résistance
-  U0 = 2*analogRead(A0)*2.5/1023.0;
-  U1 = 2*analogRead(A1)*2.5/1023.0;
+  U0 = PDIV0*analogRead(A0)*VREF/1023.0;
+  U1 = PDIV1*analogRead(A1)*VREF/1023.0;
   
   tensionResistance = U0-U1;
   Serial.println("tensionResistance="+String(tensionResistance));
@@ -322,22 +334,24 @@ void mesureCapacite() {
 void mesureTension() {
   float tensionVide;
   float tensionCharge;
- 
+
+  oled.println("Mesure en cours...");
+
   // Lecture de la tension à vide de la pile
   // Bloque le transistor en positionnant la sortie D7 à LOW
   digitalWrite(7, LOW);
-  delay(1000);
+  delay(500);
   
-  tensionVide = 2*analogRead(A0)*2.5/1023;
+  tensionVide = (PDIV0*analogRead(A0)*VREF)/1023.0;
   Serial.println("tensionVide="+String(tensionVide));
   delay(500);
 
   // Lecture de la tension en charge de la pile
   // Sature le transistor en positionnant la sortie D7 à HIGH
   digitalWrite(7, HIGH);
-  delay(1000);
+  delay(500);
 
-  tensionCharge = 2*analogRead(A0)*2.5/1023;
+  tensionCharge = (PDIV0*analogRead(A0)*VREF)/1023.0;
   Serial.println("tensionCharge="+String(tensionCharge));
   delay(500);
 
@@ -392,7 +406,6 @@ void setup() {
   digitalWrite(7, LOW);  
 
 }
-
 void loop() {
 
   // Affiche le menu de configuration lors de la première 
@@ -407,5 +420,4 @@ void loop() {
   } else {
     mesureTension();
   }
-
 }
