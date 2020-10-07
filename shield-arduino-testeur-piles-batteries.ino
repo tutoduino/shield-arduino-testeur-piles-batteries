@@ -7,50 +7,86 @@
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiAvrI2c.h"
 
+// Adresse de l'afficheur OLED sur le bus I2C
 #define I2C_ADDRESS 0x3C
 
+// Declaration de l'ecran OLED
 SSD1306AsciiAvrI2c oled;
 
-// Boolean qui indique si la configuration 
-// par le menu est finie ou non
+// Boolean qui indique que la configuration 
+// par le menu est terminee
 bool configOk = false;
 
-const uint8_t brocheBouton = 2;
+// Le bouton est relie a la broche 2 de l'Arduino Uno
+#define brocheBouton 2
 
-// Si le bouton est en mode pull-up sa valeur est 0
-// lorsqu'il est appuye. En mode pull-down sa valeur est
-// 0 lorsqu'il est appuye
-// Ici le montage est en pull-up
-#define BOUTON_APPUYE 0
+// Le bouton est conçu en mode pull-down, l'appel a la fonction
+// digitalRead retourne la valeur 1 lorsque le bouton est appuye. 
+#define BOUTON_APPUYE 1
 
-#define MESURE_TENSION 0
-#define MESURE_CAPACITE 1
+// Declaration de type enum pour le type de mesure et d'accumulateur
+enum mesureType_t: uint8_t {
+    MESURE_TENSION = 0, 
+    MESURE_CAPACITE = 1
+};
+enum accuType_t: uint8_t {
+    ALCA = 0,
+    NIMH = 1, 
+    LIION = 2
+};
 
-#define NIMH  0
-#define LIPO  1
-#define LIION 2
-#define ALCA  3
-
-uint8_t mesure;
-uint8_t accu;
+// Variables globales au programme 
+mesureType_t  mesure; // Type de mesure à effectuer (tension ou capacite)
+accuType_t    accu;   // Type d'accumulateur à mesurer (Alcaline, Li-Ion, Ni-MH,...)
 
 // Constantes de calibration 
 // -------------------------
 // Valeur de la resistance de decharge
-#define R 26.7
+#define R 20
 // Valeur de la tension de reference
-#define VREF 2.48
+#define VREF 2.5
 // Rapport pont diviseur utilise sur A0
-#define PDIV0 2
+#define PDIV0 2.49
 // Rapport pont diviseur utilise sur A1
-#define PDIV1 2
+#define PDIV1 2.49
 
-// Seuil bas de la tension des accumulateurs
-// (piles et batteries)
-#define SEUIL_BAS_TENSION_ACCU_NIMH     0.80
+// Caracteristiques des accumulateurs
+// 
+// Pile alcaline
+// 
+// Tension nominale = 1,5 V
+// Etats :
+//  Bon si tension en charge > 1,3 V
+//  Faible si 1,30 V > tension en charge > 1.00 V
+//  A changer si tension en charge < 1.00 V 
+// Pas de seuil bas car ce n'est pas une batterie rechargeable
+#define SEUIL_BON_TENSION_ACCU_ALCA     1.30
+#define SEUIL_FAIBLE_TENSION_ACCU_ALCA  1.00
 #define SEUIL_BAS_TENSION_ACCU_ALCA     0.00
+//
+// Batterie Ni-MH
+//
+// Tension nominale = 1,2 V
+// Etats :
+//  Bon si tension en charge > 1,15 V
+//  Faible si 1,15 V > tension en charge > 1.00 V
+//  A changer si tension en charge < 1.00 V 
+// Seuil bas 0.80 V
+#define SEUIL_BON_TENSION_ACCU_NIMH     1.15
+#define SEUIL_FAIBLE_TENSION_ACCU_NIMH  1.00
+#define SEUIL_BAS_TENSION_ACCU_NIMH     0.80
+//
+// Batterie Li-Ion
+//
+// Tension nominale = 3,7 V
+// Etats :
+//  Bon si tension en charge > 3,7 V
+//  Faible si 3,70 V > tension en charge > 3.00 V
+//  A changer si tension en charge < 3.00 V 
+// Seuil bas 2.00 V
+#define SEUIL_BON_TENSION_ACCU_LIION    3.70
+#define SEUIL_FAIBLE_TENSION_ACCU_LIION 3.00
 #define SEUIL_BAS_TENSION_ACCU_LIION    2.00
-#define SEUIL_BAS_TENSION_ACCU_LIPO     2.00
 
 // Détection de seuil bas de la tension de l'accumulateur
 bool seuilBasAccuAtteint = false;
@@ -178,20 +214,6 @@ bool menuAccu() {
     seuilBasAccu = SEUIL_BAS_TENSION_ACCU_LIION;    
     return true;
   }
-
-  oled.clear();
-  oled.set2X();
-  oled.println("Config");
-  oled.set1X();
-  oled.println("");  
-  oled.println("Accu Li-Po ?");
-  oled.println();
-  oled.println("oui -> Appuyez");  
-  if (appuiBouton() == true) {
-    accu = LIPO;
-    seuilBasAccu = SEUIL_BAS_TENSION_ACCU_LIPO;
-    return true;
-  }
   
   return false;
 
@@ -200,7 +222,9 @@ bool menuAccu() {
 
 void configMenu() {
 
+  // reset global variables
   seuilBasAccuAtteint = false;
+  mesure = 0;
 
   while (menuTypeMesure() != true) {
     delay(100);
@@ -225,9 +249,6 @@ void configMenu() {
    case NIMH:
       oled.println("Ni-MH");
       break;  
-   case LIPO:
-      oled.println("Li-Po");
-      break;
    case LIION:
       oled.println("Li-Ion");
       break;  
@@ -299,9 +320,9 @@ void mesureQuantiteElectricite() {
   oled.set2X();
   oled.println("Capacite");
   oled.set1X();
-  oled.println("U = "+String(U0)+" V");
-  oled.println("I = "+String(courant)+" A");
-  oled.println("Q = "+String(quantiteElectriciteTotale)+" mAh");
+  oled.println("U = "+String(U0,3)+" V");
+  oled.println("I = "+String(courant*1000,0)+" mA");
+  oled.println("Q = "+String(quantiteElectriciteTotale,3)+" mAh");
 
   delay(1000);
  
@@ -329,6 +350,43 @@ void mesureCapacite() {
     }
     configOk = false;
     }
+}
+
+String etatAccu(accuType_t typeAccu, float tensionCharge) {
+
+ 
+  
+ switch (typeAccu) {
+   case NIMH:
+      if (tensionCharge > SEUIL_BON_TENSION_ACCU_NIMH) {
+        return("Accu ok");
+      } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_NIMH) {
+        return("Accu faible");
+      } else {
+        return("Accu à recharger");
+      }        
+      break;  
+   case LIION:
+      if (tensionCharge > SEUIL_BON_TENSION_ACCU_LIION) {
+        return("Accu ok");
+      } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_LIION) {
+        return("Accu faible");
+      } else {
+        return("Accu à recharger");
+      }        
+      break;    
+   case ALCA:
+      if (tensionCharge > SEUIL_BON_TENSION_ACCU_ALCA) {
+        return("Pile ok");
+      } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_ALCA) {
+        return("Pile faible");
+      } else {
+        return("Pile à remplacer");
+      }  
+      break;        
+    default:
+      break;
+   }   
 }
 
 void mesureTension() {
@@ -364,6 +422,7 @@ void mesureTension() {
   oled.set1X();  
   oled.println("U_vide = "+String(tensionVide)+" V");
   oled.println("U_charge = "+String(tensionCharge)+" V");
+  oled.println(etatAccu(accu, tensionCharge));
   oled.println("");
   oled.println("reset -> Appuyez");  
   
@@ -420,4 +479,5 @@ void loop() {
   } else {
     mesureTension();
   }
+
 }
