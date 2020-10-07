@@ -363,7 +363,7 @@ String etatAccu(accuType_t typeAccu, float tensionCharge) {
       } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_NIMH) {
         return("Accu faible");
       } else {
-        return("Accu à recharger");
+        return("Accu a recharger");
       }        
       break;  
    case LIION:
@@ -372,7 +372,7 @@ String etatAccu(accuType_t typeAccu, float tensionCharge) {
       } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_LIION) {
         return("Accu faible");
       } else {
-        return("Accu à recharger");
+        return("Accu a recharger");
       }        
       break;    
    case ALCA:
@@ -381,7 +381,7 @@ String etatAccu(accuType_t typeAccu, float tensionCharge) {
       } else if (tensionCharge > SEUIL_FAIBLE_TENSION_ACCU_ALCA) {
         return("Pile faible");
       } else {
-        return("Pile à remplacer");
+        return("Pile a remplacer");
       }  
       break;        
     default:
